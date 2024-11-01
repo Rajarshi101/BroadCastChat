@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: BroadcastChatServer
+    env: java
+    buildCommand: javac BroadcastChatServer.java
+    startCommand: java BroadcastChatServer
+    plan: free
