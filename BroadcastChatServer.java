@@ -6,8 +6,10 @@ public class BroadcastChatServer {
     private static Map<PrintWriter, String> clients = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
-        ServerSocket serverSocket = new ServerSocket(5000);
-        System.out.println("Server is running...");
+        int port = Integer.parseInt(System.getenv("PORT")); // Get the port dynamically from Render
+        ServerSocket serverSocket = new ServerSocket(port);
+        System.out.println("Server is running on port: " + port);
+
         try {
             while (true) {
                 new Handler(serverSocket.accept()).start();
