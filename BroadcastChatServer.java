@@ -3,66 +3,61 @@ import java.net.*;
 import java.util.*;
 
 public class BroadcastChatServer {
-    private static Map<PrintWriter, String> clients = new HashMap<>();
+    private static final int PORT = 10000; // Use a fixed port as required by Render
+    private static final Set<PrintWriter> clientWriters = new HashSet<>();
 
-    public static void main(String[] args) throws IOException {
-        int port = Integer.parseInt(System.getenv("PORT")); // Get the port dynamically from Render
-        ServerSocket serverSocket = new ServerSocket(port);
-        System.out.println("Server is running on port: " + port);
+    public static void main(String[] args) {
+        System.out.println("Broadcast Chat Server is running...");
 
-        try {
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             while (true) {
-                new Handler(serverSocket.accept()).start();
+                new ClientHandler(serverSocket.accept()).start();
             }
-        } finally {
-            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
-    private static class Handler extends Thread {
+    private static class ClientHandler extends Thread {
         private Socket socket;
-        private PrintWriter writer;
-        private BufferedReader reader;
+        private PrintWriter out;
+        private BufferedReader in;
 
-        public Handler(Socket socket) {
+        public ClientHandler(Socket socket) {
             this.socket = socket;
         }
 
         public void run() {
             try {
-                reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                writer = new PrintWriter(socket.getOutputStream(), true);
-
-                System.out.println("Client connected: " + socket);
-
-                String name = reader.readLine();
-                clients.put(writer, name);
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                out = new PrintWriter(socket.getOutputStream(), true);
+                synchronized (clientWriters) {
+                    clientWriters.add(out);
+                }
 
                 String message;
-                while ((message = reader.readLine()) != null) {
-                    System.out.println("Received message from " + name + ": " + message);
-                    broadcast(name + ": " + message);
+                while ((message = in.readLine()) != null) {
+                    System.out.println("Received: " + message);
+                    broadcastMessage(message);
                 }
             } catch (IOException e) {
-                System.out.println(e);
+                e.printStackTrace();
             } finally {
-                if (writer != null) {
-                    clients.remove(writer);
-                }
                 try {
                     socket.close();
                 } catch (IOException e) {
-                    System.out.println(e);
+                    e.printStackTrace();
+                }
+                synchronized (clientWriters) {
+                    clientWriters.remove(out);
                 }
             }
         }
 
-        private void broadcast(String message) {
-            synchronized (clients) {
-                for (PrintWriter clientWriter : clients.keySet()) {
-                    if (clientWriter != writer) {
-                        clientWriter.println(message);
-                    }
+        private void broadcastMessage(String message) {
+            synchronized (clientWriters) {
+                for (PrintWriter writer : clientWriters) {
+                    writer.println(message);
                 }
             }
         }
